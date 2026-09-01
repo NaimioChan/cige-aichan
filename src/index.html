@@ -1085,7 +1085,8 @@ async function download(name,text){
         exts: [ext],
         contents: text
       });
-      if(p) toast(t("toastSavedTo", p));
+      /* 安卓只有 content:// URI，说不出存到哪；p 为 null 才是取消。 */
+      if(p !== null) toast(p ? t("toastSavedTo", p) : t("toastSaved"));
     }catch(e){ toast(t("toastSaveFail", e)); }
     return;
   }
@@ -1101,7 +1102,8 @@ async function downloadBinary(name, bytes){
       const p = await TAURI.core.invoke("save_binary", {
         defaultName: name, filterName: t("dlgFilterMidi"), exts: ["mid"], contents: Array.from(bytes)
       });
-      if(p) toast(t("toastSavedTo", p));
+      /* 安卓只有 content:// URI，说不出存到哪；p 为 null 才是取消。 */
+      if(p !== null) toast(p ? t("toastSavedTo", p) : t("toastSaved"));
     }catch(e){ toast(t("toastSaveFail", e)); }
     return;
   }
