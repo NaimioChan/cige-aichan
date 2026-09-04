@@ -245,8 +245,17 @@ pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padd
 .aiadv{flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap}
 .aiadv label{flex:none}
 .aiadv input[type="range"]{flex:1;min-width:120px;accent-color:var(--accent)}
+.aiadv select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;
+  font-size:13px;color:var(--fg);outline:none;font-family:inherit;max-width:240px}
+.aiadv select:focus{border-color:var(--accent)}
 .aiadv b{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
 .aibtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.aibtns .stop{border-color:var(--ovf);color:var(--ovf);font-weight:600}
+.aibtns .stop:hover{border-color:var(--ovf);color:var(--ovf);background:rgba(229,106,74,.12)}
+.aiprog{display:flex;align-items:center;gap:10px;margin-top:12px}
+.aibar{flex:1;height:8px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+#aifillbar{height:100%;width:0;background:var(--accent);border-radius:5px;transition:width .25s}
+.aiptext{font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ailog{margin-top:14px;max-height:180px;overflow:auto;background:var(--panel2);border:1px solid var(--line);
   border-radius:8px;padding:8px 10px;font-size:11.5px;line-height:1.7;color:var(--dim);
   font-family:ui-monospace,monospace;display:flex;flex-direction:column;gap:2px}
@@ -471,6 +480,10 @@ XXXX XXXX</pre>
     <textarea id="aistyle" rows="3" data-i18n-placeholder="aiStylePh" placeholder="例：写一首夏夜校园风，句尾尽量押 ang 韵…"></textarea>
     <span class="aihint" data-i18n="aiStyleHint">每次填词都会带上</span></div>
 
+  <div class="airow aiadv"><label data-i18n="aiScopeLabel">处理范围</label>
+    <select id="aiscope"></select>
+    <span class="aihint" id="aipending">还有 0 句待填</span></div>
+
   <h4 data-i18n="aiAdvH4">高级</h4>
   <div class="airow aiadv"><label data-i18n="aiMaxTokensLabel">最大回复 tokens</label>
     <input type="range" id="aimax" min="500" max="8000" step="100" value="3000"> <b id="aimaxv">3000</b></div>
@@ -480,7 +493,13 @@ XXXX XXXX</pre>
   <div class="aibtns">
     <button class="pri" id="aigo" data-i18n="aiGo">整首填词</button>
     <button id="aichk" data-i18n="aiCheckBtn">检查全篇</button>
+    <button class="stop" id="aistop" data-i18n="aiStop" style="display:none">停止</button>
+    <button id="aitest" data-i18n="aiTestBtn">测试连接</button>
     <button id="aiclose" data-i18n="aiClose">完成</button>
+  </div>
+  <div id="aiprog" class="aiprog" style="display:none">
+    <div class="aibar"><div id="aifillbar"></div></div>
+    <span id="aiprogtext" class="aiptext"></span>
   </div>
   <div id="ailog" class="ailog"></div>
 </div></div>
