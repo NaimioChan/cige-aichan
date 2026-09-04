@@ -11,4 +11,4 @@ package-lock.json
 Thumbs.db
 
 src-tauri/gen/android/keystore.properties
-*.jks
+*.jksrelease/CigeChan-v2.0.3-windows-x64-portable/
