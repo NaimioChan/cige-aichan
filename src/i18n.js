@@ -170,6 +170,8 @@ zh: {
 
   /* ---- AI 填词（中转站 / OpenAI 兼容接口） ---- */
   aiBtn: "AI 填词", aiTitle: "AI 填词",
+  aiBtnTitle: "接入 OpenAI 兼容接口（中转站），按词格自动填词",
+  aiBtnRunning: "AI 运行中", aiBtnRunningTitle: "AI 正在后台工作，点开查看进度或停止",
   aiIntro: "接入任意 OpenAI 兼容接口（各类中转站、one-api / new-api 自建站都行），按词格逐句自动填词。所有设置只存在本机浏览器，不会写进工程文件、也不会跟着导出。",
   aiUrlLabel: "接口地址 BASE_URL", aiUrlHint: "如 https://api.example.com 或 https://api.example.com/v1，结尾的 /v1 会自动补",
   aiKeyLabel: "API Key", aiKeyHint: "中转站发给你的密钥，只存本机浏览器",
@@ -383,6 +385,8 @@ zhHant: {
 
   /* ---- AI 填詞（中轉站 / OpenAI 相容介面） ---- */
   aiBtn: "AI 填詞", aiTitle: "AI 填詞",
+  aiBtnTitle: "接入 OpenAI 相容介面（中轉站），按詞格自動填詞",
+  aiBtnRunning: "AI 執行中", aiBtnRunningTitle: "AI 正在幕後工作，點開查看進度或停止",
   aiIntro: "接入任意 OpenAI 相容介面（各類中轉站、one-api / new-api 自建站都行），按詞格逐句自動填詞。所有設定只存在本機瀏覽器，不會寫進工程檔案、也不會跟著匯出。",
   aiUrlLabel: "介面位址 BASE_URL", aiUrlHint: "如 https://api.example.com 或 https://api.example.com/v1，結尾的 /v1 會自動補",
   aiKeyLabel: "API Key", aiKeyHint: "中轉站發給你的金鑰，只存本機瀏覽器",
@@ -596,6 +600,8 @@ ja: {
 
   /* ---- AI 埋め込み（中継サーバー / OpenAI 互換 API） ---- */
   aiBtn: "AI 埋め込み", aiTitle: "AI 埋め込み",
+  aiBtnTitle: "OpenAI 互換 API（中継サーバー）に接続し、格子に沿って自動的に歌詞を埋めます",
+  aiBtnRunning: "AI 実行中", aiBtnRunningTitle: "AI がバックグラウンドで動作中。クリックで進行状況の確認・停止",
   aiIntro: "OpenAI 互換の API（各種中継サーバー、one-api / new-api など）に接続し、格子に沿って自動的に歌詞を埋めます。設定はブラウザのローカルにのみ保存され、プロジェクトファイルには書き込まれません。",
   aiUrlLabel: "API ベース URL", aiUrlHint: "例：https://api.example.com または https://api.example.com/v1（末尾の /v1 は自動補完）",
   aiKeyLabel: "API Key", aiKeyHint: "中継サーバーが発行したキー。ローカルにのみ保存されます",
@@ -809,6 +815,8 @@ ko: {
 
   /* ---- AI 채우기(중계 서버 / OpenAI 호환 API) ---- */
   aiBtn: "AI 채우기", aiTitle: "AI 채우기",
+  aiBtnTitle: "OpenAI 호환 API(중계 서버)에 연결하여 격자에 맞춰 자동으로 가사를 채웁니다",
+  aiBtnRunning: "AI 실행 중", aiBtnRunningTitle: "AI 가 백그라운드에서 작동 중입니다. 클릭하여 진행 상황 확인 또는 중지",
   aiIntro: "OpenAI 호환 API(각종 중계 서버, one-api / new-api 등)에 연결하여 격자에 맞춰 자동으로 가사를 채웁니다. 설정은 브라우저 로컬에만 저장되며 프로젝트 파일에 기록되지 않습니다.",
   aiUrlLabel: "API 베이스 URL", aiUrlHint: "예: https://api.example.com 또는 https://api.example.com/v1 (끝의 /v1은 자동 보완)",
   aiKeyLabel: "API Key", aiKeyHint: "중계 서버에서 발급한 키이며 로컬에만 저장됩니다",

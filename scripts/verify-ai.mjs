@@ -109,7 +109,8 @@ await sleep(120);
 check("填词期间 aiBusy=true", await ev("aiBusy") === true);
 check("填词期间按钮换成停止", await ev("document.querySelector('#aistop').style.display !== 'none' && document.querySelector('#aigo').style.display === 'none'"));
 check("填词期间配置上锁", await ev("document.querySelector('#aiurl').disabled === true"));
-check("填词期间面板关不掉", await ev("(aiClosePanel(), document.querySelector('#aip').classList.contains('show'))"));
+check("运行中可关面板，顶栏指示灯保持", await ev("(aiClosePanel(), !document.querySelector('#aip').classList.contains('show') && document.querySelector('#aibtn').classList.contains('ai-running'))"));
+await ev("aiOpenPanel()");   // 重开面板，继续后续面板内断言
 check("进度条可见", await ev("document.querySelector('#aiprog').style.display !== 'none'"));
 const runResult = await runPromise;
 check("填词流程完成", runResult === 'done', runResult);
