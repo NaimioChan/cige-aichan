@@ -227,6 +227,8 @@ async function aiFillLine(sec, L, opts){
   throw new Error(t("aiErrNotFit", AI_MAX_RETRY + 1, lastErr));
 }
 
+let aiTestCtrl = null;       // 测试连接的独立中止器
+
 /* ---------- 运行控制 / 进度 ---------- */
 let aiBusy = false;
 let aiAbort = null;          // { cancelled, ctrl:AbortController }
@@ -243,6 +245,13 @@ function aiSetBusy(b){
   AI_BUSY_INPUTS.forEach(s => { const e = $(s); if(e) e.disabled = b; });
   const prog = $("#aiprog");
   if(prog && !b) prog.style.display = aiProgTotal ? "" : "none";
+  /* 顶栏按钮变运行指示灯：面板关了也能看出后台在跑，随时点开回来看/停 */
+  const top = $("#aibtn");
+  if(top){
+    top.classList.toggle("ai-running", b);
+    top.title = b ? t("aiBtnRunningTitle") : t("aiBtnTitle");
+    top.textContent = b ? t("aiBtnRunning") : t("aiBtn");
+  }
 }
 
 function aiSetProgress(done, total, msg){
@@ -369,13 +378,16 @@ async function aiTest(){
   }
   const btn = $("#aitest");
   btn.disabled = true; btn.textContent = t("aiTesting");
+  aiTestCtrl = new AbortController();
   try{
-    const r = await aiChat([{ role: "user", content: "请只回复两个字：正常" }], { temperature: 0, maxTokens: 16 });
+    const r = await aiChat([{ role: "user", content: "请只回复两个字：正常" }], { temperature: 0, maxTokens: 16, signal: aiTestCtrl.signal });
     const reply = String(r).trim().slice(0, 60);
     aiLog(t("aiToastTestOk", reply)); toast(t("aiToastTestOk", reply));
   }catch(e){
-    aiLog(t("aiToastTestFail", e.message)); toast(t("aiToastTestFail", e.message));
+    if(e.aiAborted) aiLog(t("aiErrAborted"));   // 测试连接被中止：静默记日志即可
+    else { aiLog(t("aiToastTestFail", e.message)); toast(t("aiToastTestFail", e.message)); }
   }finally{
+    aiTestCtrl = null;
     btn.textContent = t("aiTestBtn");
     btn.disabled = aiBusy;
     aiSyncPanel();
@@ -395,10 +407,9 @@ function aiLog(msg){
 
 /* ---------- 面板 UI ---------- */
 function aiOpenPanel(){ $("#aip").classList.add("show"); aiSyncPanel(); }
-function aiClosePanel(){
-  if(aiBusy){ toast(t("aiBlockedClose")); return; }   // 运行中不许关：关了就看不见停止按钮了
-  $("#aip").classList.remove("show");
-}
+/* 运行中允许关面板：每句填完即已写入工程，不会丢；顶栏按钮亮着运行指示灯，
+   随时点开回来看进度或停止——比把用户锁在面板上更合理。 */
+function aiClosePanel(){ $("#aip").classList.remove("show"); }
 
 function aiSyncPanel(){
   $("#aiurl").value = aiCfg.baseUrl;
@@ -439,7 +450,12 @@ function aiBind(){
     const pend = $("#aipending"); if(pend) pend.textContent = t("aiPending", aiPendingLines().length);
   });
 
-  $("#aibtn").onclick = () => { if($("#aip").classList.contains("show")) aiClosePanel(); else aiOpenPanel(); };
+  $("#aibtn").onclick = () => {
+    const shown = $("#aip").classList.contains("show");
+    /* 运行中点顶栏按钮总是打开面板（方便回来看进度/停止）；空闲时才是开关切换 */
+    if(!shown) aiOpenPanel();
+    else if(!aiBusy) aiClosePanel();
+  };
   $("#aiclose").onclick = aiClosePanel;
   $("#aip").onclick = e => { if(e.target.id === "aip") aiClosePanel(); };
   $("#aigo").onclick = () => aiRunAll("fill");

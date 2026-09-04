@@ -272,6 +272,11 @@ pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padd
 .aibtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
 .aibtns .stop{border-color:var(--ovf);color:var(--ovf);font-weight:600}
 .aibtns .stop:hover{border-color:var(--ovf);color:var(--ovf);background:rgba(229,106,74,.12)}
+/* 顶栏 AI 按钮：运行中亮起呼吸点，提示后台还有任务在跑 */
+#aibtn.ai-running{border-color:var(--accent);color:var(--accent);position:relative;padding-left:24px}
+#aibtn.ai-running::before{content:"";position:absolute;left:9px;top:50%;transform:translateY(-50%);
+  width:8px;height:8px;border-radius:50%;background:var(--accent);animation:aiPulse 1.2s ease-in-out infinite}
+@keyframes aiPulse{0%,100%{opacity:.35;transform:translateY(-50%) scale(.8)}50%{opacity:1;transform:translateY(-50%) scale(1.15)}}
 .aiprog{display:flex;align-items:center;gap:10px;margin-top:12px}
 .aibar{flex:1;height:8px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
 #aifillbar{height:100%;width:0;background:var(--accent);border-radius:5px;transition:width .25s}
@@ -315,7 +320,7 @@ pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padd
     </div>
     <div class="grow"></div>
     <button id="reflow" data-i18n="btnReflow" data-i18n-title="btnReflowTitle" title="把每句超出的字顺移到下一句">整理溢出</button>
-    <button id="aibtn" data-i18n="aiBtn" title="接入 OpenAI 兼容接口（中转站），按词格自动填词">AI 填词</button>
+    <button id="aibtn" data-i18n="aiBtn" data-i18n-title="aiBtnTitle" title="接入 OpenAI 兼容接口（中转站），按词格自动填词">AI 填词</button>
     <button id="small" data-i18n="btnSmall">A−</button><button id="big" data-i18n="btnBig">A+</button>
     <button id="bgb" data-i18n="btnBg">背景</button>
     <div class="menuwrap">
