@@ -29,6 +29,26 @@ html[data-theme="paper"]{
   --cellbd:#c8b696; --cellbg:#fffdf7; --fill:#241f19; --ovf:#c0392b;
   --panel-t:rgba(250,246,236,.84); --cell-t:rgba(255,253,247,.62); --line-t:rgba(0,0,0,.18);
 }
+/* ---------- 主题色（换色调） ----------
+   只覆盖 --accent / --accent-soft 两个变量，明暗两套底色的结构不动。
+   data-accent 由 state.accent 驱动，"auto"（默认）不设属性、走上面的原版配色。
+   每个色都按 dark / paper 各调了一档明度，保证对比度够。 */
+html[data-accent="blue"]{ --accent:#5ab4d8; --accent-soft:rgba(90,180,216,.16); }
+html[data-theme="paper"][data-accent="blue"]{ --accent:#3389D1; --accent-soft:rgba(51,137,209,.12); }
+html[data-accent="green"]{ --accent:#7fbf8e; --accent-soft:rgba(127,191,142,.16); }
+html[data-theme="paper"][data-accent="green"]{ --accent:#3e7d4f; --accent-soft:rgba(62,125,79,.12); }
+html[data-accent="violet"]{ --accent:#b39ddb; --accent-soft:rgba(179,157,219,.16); }
+html[data-theme="paper"][data-accent="violet"]{ --accent:#6a4fa3; --accent-soft:rgba(106,79,163,.12); }
+html[data-accent="rose"]{ --accent:#e08a97; --accent-soft:rgba(224,138,151,.16); }
+html[data-theme="paper"][data-accent="rose"]{ --accent:#b5485d; --accent-soft:rgba(181,72,93,.12); }
+html[data-accent="cyan"]{ --accent:#6fd6c8; --accent-soft:rgba(111,214,200,.16); }
+html[data-theme="paper"][data-accent="cyan"]{ --accent:#2a8f85; --accent-soft:rgba(42,143,133,.12); }
+html[data-accent="orange"]{ --accent:#f0a35e; --accent-soft:rgba(240,163,94,.16); }
+html[data-theme="paper"][data-accent="orange"]{ --accent:#c96f1f; --accent-soft:rgba(201,111,31,.12); }
+html[data-accent="slate"]{ --accent:#9aa7b5; --accent-soft:rgba(154,167,181,.16); }
+html[data-theme="paper"][data-accent="slate"]{ --accent:#5a6673; --accent-soft:rgba(90,102,115,.12); }
+html[data-accent="red"]{ --accent:#e06655; --accent-soft:rgba(224,102,85,.16); }
+html[data-theme="paper"][data-accent="red"]{ --accent:#b03a2e; --accent-soft:rgba(176,58,46,.12); }
 
 /* ---------- 自定义背景 ---------- */
 #bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
@@ -433,6 +453,10 @@ XXXX XXXX</pre>
     <button class="pre" data-th="paper" data-i18n="bgThemePaper">稿纸</button>
   </div>
 
+  <h4 data-i18n="accentH4">主题色</h4>
+  <div class="bgrow" id="accrow"></div>
+  <p class="tip" data-i18n="accentTip">只换强调色，底色明暗不受影响。</p>
+
   <h4 data-i18n="bgCustomH4">换成自己的</h4>
   <div class="bgrow">
     <button id="bgpick" data-i18n="bgPick">选一张图片…</button>
@@ -499,7 +523,7 @@ const SAMPLE = [
   {name:"Verse", lines:[{g:[4,3],t:""},{g:[3,4],t:""},{g:[2,5],t:""},{g:[4,4],t:""}]},
   {name:"Chorus",  lines:[{g:[5,3],t:""},{g:[4,4],t:""},{g:[5,3],t:""},{g:[6],t:""}]}
 ];
-let state = { title:"未命名歌曲", sections:JSON.parse(JSON.stringify(SAMPLE)), cell:44, theme:"dark", lang:"zh",
+let state = { title:"未命名歌曲", sections:JSON.parse(JSON.stringify(SAMPLE)), cell:44, theme:"dark", lang:"zh", accent:"auto",
                exp:{alts:false,note:false}, bg:{mode:"none", color:"#1a1614", dim:.55, blur:0} };
 let focusRef = null;      // {si,li,pos}
 let composing = false;
@@ -1573,6 +1597,47 @@ function setCell(v){ state.cell = Math.max(28,Math.min(72,v)); document.document
 let bgImg = "";
 try{ bgImg = localStorage.getItem("cige.bg") || ""; }catch(e){}
 
+/* ---------- 主题色（换色调） ---------- */
+const ACCENTS = [
+  { id:"auto",   dark:"#e0a83f", paper:"#a8632a" },   // 原版配色
+  { id:"blue",   dark:"#5ab4d8", paper:"#3389D1" },
+  { id:"green",  dark:"#7fbf8e", paper:"#3e7d4f" },
+  { id:"violet", dark:"#b39ddb", paper:"#6a4fa3" },
+  { id:"rose",   dark:"#e08a97", paper:"#b5485d" },
+  { id:"cyan",   dark:"#6fd6c8", paper:"#2a8f85" },
+  { id:"orange", dark:"#f0a35e", paper:"#c96f1f" },
+  { id:"slate",  dark:"#9aa7b5", paper:"#5a6673" },
+  { id:"red",    dark:"#e06655", paper:"#b03a2e" },
+];
+
+function applyAccent(){
+  const a = state.accent;
+  if(a && a !== "auto" && ACCENTS.some(x => x.id === a)) document.documentElement.dataset.accent = a;
+  else delete document.documentElement.dataset.accent;   // auto：走主题自带配色
+}
+
+function syncAccentPanel(){
+  const box = $("#accrow");
+  if(!box.children.length){
+    ACCENTS.forEach(a=>{
+      const b = el("button","swatch");
+      b.title = t("accentName", a.id);
+      b.dataset.acc = a.id;
+      b.onclick = ()=>{ state.accent = a.id; applyAccent(); syncAccentPanel(); save(); };
+      box.appendChild(b);
+    });
+  }
+  const isPaper = state.theme === "paper";   // dark/paper 各一档，底色换档时跟着重刷
+  box.querySelectorAll(".swatch").forEach(b=>{
+    const a = ACCENTS.find(x => x.id === (b.dataset.acc || "auto"));
+    b.style.background = isPaper ? a.paper : a.dark;
+    b.classList.toggle("on", (b.dataset.acc || "auto") === (state.accent || "auto"));
+    b.style.outline = b.classList.contains("on") ? "2px solid var(--accent)" : "";
+    b.style.outlineOffset = "2px";
+  });
+}
+
+
 function saveBg(){
   try{
     if(bgImg) localStorage.setItem("cige.bg", bgImg);
@@ -1657,11 +1722,11 @@ function loadBgImage(file){
   fr.readAsDataURL(file);
 }
 
-$("#bgb").onclick = ()=>{ syncBgPanel(); $("#bgp").classList.add("show"); };
+$("#bgb").onclick = ()=>{ syncBgPanel(); syncAccentPanel(); $("#bgp").classList.add("show"); };
 $("#bgok").onclick = ()=>$("#bgp").classList.remove("show");
 $("#bgp").onclick = e=>{ if(e.target.id === "bgp") $("#bgp").classList.remove("show"); };
 $("#bgp").querySelectorAll(".pre").forEach(p=>{
-  p.onclick = ()=>{ state.theme = p.dataset.th; applyBg(); syncBgPanel(); save(); };
+  p.onclick = ()=>{ state.theme = p.dataset.th; applyBg(); syncBgPanel(); syncAccentPanel(); save(); };   // 底色换档时刷新色板（dark/paper 各一档颜色）
 });
 $("#bgcolor").oninput = e=>setBgColor(e.target.value);
 $("#bgpick").onclick = ()=>pick("image/*");
@@ -1770,7 +1835,9 @@ if(!I18N[state.lang]) state.lang = "zh";
 // 没动过字号（还是出厂默认 44）又赶上窄屏，就先给个更适配的默认值；已经自己调过大小的
 // 不去动它——A−/A+ 存下来的选择要一直尊重。
 if(state.cell === 44 && innerWidth < 480) state.cell = 32;
+if(!state.accent || !["auto","blue","green","violet","rose","cyan","orange","slate","red"].includes(state.accent)) state.accent = "auto";
 applyBg();
+applyAccent();
 // 顶栏和帮助面板里的图标直接复用 <link rel="icon"> 那份 base64，不再多存一份
 { const ico = document.querySelector('link[rel="icon"]');
   if(ico) document.querySelectorAll("img.logo").forEach(im=>{ im.src = ico.href; }); }
