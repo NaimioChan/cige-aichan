@@ -97,6 +97,8 @@ zh: {
   bgCustomH4: "换成自己的", bgPick: "选一张图片…", bgColorLabel: "纯色", bgNone: "恢复默认",
   bgTip: "也可以直接把图片拖进窗口。图片会自动缩到合适尺寸再记住，不会拖慢程序。",
   bgDimLabel: "蒙版浓度", bgBlurLabel: "模糊", bgOk: "完成",
+  accentH4: "主题色", accentTip: "只换强调色，底色明暗不受影响。",
+  accentName: id => ({auto:"默认",blue:"水蓝",green:"松绿",violet:"紫藤",rose:"海棠",cyan:"黛青",orange:"橘柚",slate:"墨灰",red:"朱砂"}[id] || id),
 
   dropText: "松手即可导入 .txt / .json，或把图片拖进来当背景",
 
@@ -312,6 +314,8 @@ zhHant: {
   bgCustomH4: "換成自己的", bgPick: "選一張圖片…", bgColorLabel: "純色", bgNone: "恢復預設",
   bgTip: "也可以直接把圖片拖進視窗。圖片會自動縮到合適尺寸再記住，不會拖慢程式。",
   bgDimLabel: "蒙版濃度", bgBlurLabel: "模糊", bgOk: "完成",
+  accentH4: "主題色", accentTip: "只換強調色，底色明暗不受影響。",
+  accentName: id => ({auto:"預設",blue:"水藍",green:"松綠",violet:"紫藤",rose:"海棠",cyan:"黛青",orange:"橘柚",slate:"墨灰",red:"硃砂"}[id] || id),
 
   dropText: "鬆手即可匯入 .txt / .json，或把圖片拖進來當背景",
 
@@ -610,6 +614,8 @@ ja: {
   aiStylePh: "例：夏の夜の学園風で、できるだけ ang 韻で終え、ひかえめた口調で",
   aiAdvH4: "詳細設定",
   aiMaxTokensLabel: "最大返答 tokens", aiTemperatureLabel: "創造性 temperature",
+  accentH4: "テーマカラー", accentTip: "アクセント色だけを変えます。明暗の背景には影響しません。",
+  accentName: id => ({auto:"デフォルト",blue:"水色",green:"松緑",violet:"藤色",rose:"海棠",cyan:"青磁",orange:"柑橘",slate:"墨色",red:"朱色"}[id] || id),
   aiClose: "閉じる",
   aiGo: "全編埋め込み", aiCheckBtn: "全篇チェック", aiStop: "停止", aiStopping: "停止中…",
   aiTestBtn: "接続テスト", aiTesting: "テスト中…",
@@ -742,6 +748,8 @@ ko: {
   bgCustomH4: "직접 바꾸기", bgPick: "이미지 선택…", bgColorLabel: "단색", bgNone: "기본값으로 복원",
   bgTip: "이미지를 창에 직접 끌어다 놓아도 됩니다. 적당한 크기로 자동 축소되어 저장되므로 프로그램이 느려지지 않습니다.",
   bgDimLabel: "마스크 농도", bgBlurLabel: "블러", bgOk: "완료",
+  accentH4: "테마 색상", accentTip: "강조 색만 바꿉니다. 밝고 어두운 배경에는 영향이 없습니다.",
+  accentName: id => ({auto:"기본",blue:"물빛",green:"솔록",violet:"등황",rose:"해당화",cyan:"청자",orange:"귤빛",slate:"먹빛",red:"주홍"}[id] || id),
 
   dropText: "손을 떼면 .txt / .json을 가져오거나, 이미지를 놓으면 배경으로 설정됩니다",
 
