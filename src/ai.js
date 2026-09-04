@@ -3,23 +3,30 @@
    支持任意「OpenAI 兼容」接口（各种中转站基本都是这个格式）：
    POST {base}/chat/completions，body 里 model + messages，Authorization: Bearer <key>。
 
-   面板的四个设置（BASE_URL / API_KEY / MODEL / 风格提示词）都只存本机
+   面板的设置（BASE_URL / API_KEY / MODEL / 风格提示词 / 处理范围）都只存本机
    localStorage（cige.ai.v1），不进工程文件、不导出、不上传。
 
-   填词流水线（fillLine 循环）：
+   填词流水线（aiRunAll → aiFillLine 循环）：
    1. 拼系统提示词：全曲设定 + 本句词格（逐分句的格数和已填内容）+ 用户风格提示词
    2. 请求 AI 返回 JSON：{ line: "逐分句用空格分隔的填词", note: "一句话说明思路" }
    3. 本地校验：按 CL()（跟主程序同一套拗音/浊点拼格规则）数每个分句的字数，
       对不上就带着具体错误信息再发给 AI，最多重试 3 次
    4. 全部通过才写回 state，绝不写一句字数不对的词进词格
-   「检查全篇」同理：整首歌一起交给 AI 审（押韵/意象/连贯），返回逐句替换建议，
-   同样逐句本地校验格数，不合格的句子自动丢弃、只保留改对了的。
+
+   交互：
+   - 运行中：动作按钮换成「停止」（AbortController 中断在途请求），配置输入框上锁，
+     面板不允许关闭（防误关丢进度），底部进度条实时显示 n/m 与当前句
+   - 「测试连接」：一次最小对话请求，验证地址 / Key / 模型名
+   - 「处理范围」：整首，或只处理某一段
+   - AI 改写已有句子时，原来的写法自动存进该句的备选版本，不丢稿
+   - 「检查全篇」：整首歌交给 AI 审（押韵/意象/连贯），返回逐句替换建议，
+     同样逐句本地校验格数，不合格的句子自动丢弃、只保留改对了的
 */
 
 const AI_STORE_KEY = "cige.ai.v1";
 
 /* ---------- 设置（只存本机） ---------- */
-let aiCfg = { baseUrl: "", apiKey: "", model: "", style: "", maxTokens: 3000, temperature: 0.9 };
+let aiCfg = { baseUrl: "", apiKey: "", model: "", style: "", maxTokens: 3000, temperature: 0.9, scope: "all" };
 try{
   const s = localStorage.getItem(AI_STORE_KEY);
   if(s){ const o = JSON.parse(s); if(o && typeof o === "object") aiCfg = Object.assign(aiCfg, o); }
@@ -36,7 +43,7 @@ function aiNormBase(url){
 }
 
 /* ---------- 与主程序共享的格子计数（index.html 里定义，这里只引用） ---------- */
-/* cap / CL / RT / state / t / toast / render / redrawRow 均由 index.html 提供 */
+/* cap / CL / RT / state / t / toast / render / save 均由 index.html 提供 */
 
 /* ---------- 请求 ---------- */
 function aiHeaders(){
@@ -46,25 +53,32 @@ function aiHeaders(){
   };
 }
 
+/* 用户主动停止时抛出的可识别错误 */
+function aiAbortedErr(){ const e = new Error(t("aiErrAborted")); e.aiAborted = true; return e; }
+
 async function aiChat(messages, opts){
+  opts = opts || {};
   const base = aiNormBase(aiCfg.baseUrl);
   if(!base) throw new Error(t("aiErrNoBaseUrl"));
   if(!aiCfg.apiKey) throw new Error(t("aiErrNoKey"));
   const body = {
     model: aiCfg.model,
     messages,
-    temperature: (opts && opts.temperature !== undefined) ? opts.temperature : aiCfg.temperature,
+    temperature: opts.temperature !== undefined ? opts.temperature : aiCfg.temperature,
     stream: false
   };
-  if(aiCfg.maxTokens) body.max_tokens = aiCfg.maxTokens;
+  const maxTok = opts.maxTokens || aiCfg.maxTokens;
+  if(maxTok) body.max_tokens = maxTok;
   let resp;
   try{
     resp = await fetch(base + "/chat/completions", {
       method: "POST",
       headers: aiHeaders(),
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: opts.signal
     });
   }catch(e){
+    if(e && (e.name === "AbortError" || e.code === 20)) throw aiAbortedErr();
     throw new Error(t("aiErrNetwork") + e.message);
   }
   if(!resp.ok){
@@ -151,26 +165,43 @@ function aiCheckFill(text, g){
   return null;
 }
 
-/* 把「分句间空格分隔」的文本写回一句（格子钉死的规则跟手填一致：多余截掉、不足留空） */
+/* 把「分句间空格分隔」的文本写回一句（格子钉死的规则跟手填一致：多余截掉、不足留空）。
+   原写法若非空且变了，自动存进该句的备选版本——跟应用「不会丢稿」的规矩一致。 */
 function aiApplyLineText(L, text){
   const parts = text.split(/\s+/).filter(Boolean);
   let out = "";
-  let i = 0;
   for(let gi = 0; gi < L.g.length; gi++){
     const cl = CL(parts[gi] || "");
-    for(let k = 0; k < L.g[gi]; k++){
-      const c = cl[k] !== undefined ? cl[k] : " ";
-      out += c;
-    }
-    i += L.g[gi];
+    for(let k = 0; k < L.g[gi]; k++) out += cl[k] !== undefined ? cl[k] : " ";
   }
+  const prev = RT(L.t), next = RT(out);
+  if(prev && next !== prev && Array.isArray(L.alts) && !L.alts.includes(prev)) L.alts.push(prev);
   L.t = out;
+}
+
+/* ---------- 处理范围 ---------- */
+function aiScopeIndex(){
+  const m = /^sec-(\d+)$/.exec(aiCfg.scope || "all");
+  if(!m) return null;
+  return +m[1] < state.sections.length ? +m[1] : null;   // 段落被删了就退回整首
+}
+function aiLinesInScope(){
+  const si = aiScopeIndex();
+  const out = [];
+  state.sections.forEach((sec, i) => {
+    if(si !== null && i !== si) return;
+    sec.lines.forEach((L, li) => out.push({ sec, L, si: i, li }));
+  });
+  return out;
+}
+function aiPendingLines(){
+  return aiLinesInScope().filter(x => CL(RT(x.L.t)).length < cap(x.L));
 }
 
 /* ---------- 单句 AI 填词（含校验-重试循环） ---------- */
 const AI_MAX_RETRY = 3;
 
-async function aiFillLine(sec, L){
+async function aiFillLine(sec, L, opts){
   const messages = [
     { role: "system", content: aiSystemPrompt() },
     { role: "user", content:
@@ -181,9 +212,10 @@ async function aiFillLine(sec, L){
   ];
   let lastErr = "";
   for(let attempt = 0; attempt <= AI_MAX_RETRY; attempt++){
+    if(aiAbort && aiAbort.cancelled) throw aiAbortedErr();
     const msgs = messages.slice();
     if(lastErr) msgs.push({ role: "user", content: t("aiRetryPrompt", lastErr) });
-    const raw = await aiChat(msgs);
+    const raw = await aiChat(msgs, opts);
     let j;
     try{ j = aiParseJson(raw); }
     catch(e){ lastErr = t("aiCheckJson"); continue; }
@@ -195,15 +227,39 @@ async function aiFillLine(sec, L){
   throw new Error(t("aiErrNotFit", AI_MAX_RETRY + 1, lastErr));
 }
 
-/* ---------- 整首填 / 整首检查 ---------- */
+/* ---------- 运行控制 / 进度 ---------- */
 let aiBusy = false;
+let aiAbort = null;          // { cancelled, ctrl:AbortController }
+let aiProgDone = 0, aiProgTotal = 0;
 
-function aiSetBusy(b, msg){
+const AI_BUSY_INPUTS = ["#aiurl", "#aikey", "#aimodel", "#aistyle", "#aimax", "#aitemp", "#aiscope", "#aitest", "#aiclose"];
+
+function aiSetBusy(b){
   aiBusy = b;
-  const btn = $("#aigo");
-  if(btn){ btn.disabled = b; btn.textContent = b ? (msg || t("aiWorking")) : t("aiGo"); }
-  const chk = $("#aichk");
-  if(chk) chk.disabled = b;
+  const show = (id, on) => { const e = $(id); if(e) e.style.display = on ? "" : "none"; };
+  show("#aigo", !b); show("#aichk", !b); show("#aitest", !b); show("#aistop", b);
+  const stop = $("#aistop");
+  if(stop) stop.textContent = aiAbort && aiAbort.cancelled ? t("aiStopping") : t("aiStop");
+  AI_BUSY_INPUTS.forEach(s => { const e = $(s); if(e) e.disabled = b; });
+  const prog = $("#aiprog");
+  if(prog && !b) prog.style.display = aiProgTotal ? "" : "none";
+}
+
+function aiSetProgress(done, total, msg){
+  aiProgDone = done; aiProgTotal = total;
+  const prog = $("#aiprog"); if(prog) prog.style.display = "";
+  const bar = $("#aifillbar");
+  if(bar) bar.style.width = (total > 0 ? Math.round(done / total * 100) : 0) + "%";
+  const txt = $("#aiprogtext");
+  if(txt) txt.textContent = msg || t("aiProg", done, total);
+}
+
+function aiStop(){
+  if(!aiBusy || !aiAbort || aiAbort.cancelled) return;
+  aiAbort.cancelled = true;
+  try{ aiAbort.ctrl.abort(); }catch(e){}
+  const stop = $("#aistop"); if(stop) stop.textContent = t("aiStopping");
+  aiSetProgress(aiProgDone, aiProgTotal, t("aiStopping"));
 }
 
 async function aiRunAll(mode){
@@ -213,73 +269,84 @@ async function aiRunAll(mode){
     toast(t("aiToastNeedCfg"));
     return;
   }
-  const hasEmpty = state.sections.some(sec => sec.lines.some(L => {
-    const cl = CL(RT(L.t));
-    return cl.length < cap(L);
-  }));
-  if(mode === "fill" && !hasEmpty && !confirm(t("aiConfirmAllFilled"))){ return; }
+  const scopeLines = aiLinesInScope();
+  const todo = mode === "fill" ? scopeLines.filter(x => CL(RT(x.L.t)).length < cap(x.L)) : scopeLines;
+  if(mode === "fill" && !todo.length && !confirm(t("aiConfirmAllFilled"))) return;
 
   aiSaveCfg();
-  aiSetBusy(true, mode === "fill" ? t("aiWorkingFill") : t("aiWorkingCheck"));
+  aiAbort = { cancelled: false, ctrl: new AbortController() };
+  const signal = aiAbort.ctrl.signal;
+  aiSetBusy(true);
+  aiProgDone = 0; aiProgTotal = mode === "fill" ? todo.length : Math.max(todo.length, 1);
+  aiSetProgress(0, aiProgTotal, mode === "fill" ? t("aiWorkingFill") : t("aiWorkingCheck"));
   const startedAt = Date.now();
-  let ok = 0, skip = 0, notes = [];
+  let ok = 0, skip = 0, stopped = false, notes = [];
   try{
     if(mode === "fill"){
-      const todo = [];
-      state.sections.forEach((sec, si) => sec.lines.forEach((L, li) => {
-        if(CL(RT(L.t)).length < cap(L)) todo.push({ sec, L, si, li });
-      }));
       for(const item of todo){
-        aiSetBusy(true, t("aiProgress", item.si + 1, item.li + 1));
+        if(aiAbort.cancelled){ stopped = true; break; }
+        aiSetProgress(aiProgDone, aiProgTotal, t("aiProgress", item.si + 1, item.li + 1));
         try{
-          const r = await aiFillLine(item.sec, item.L);
+          const r = await aiFillLine(item.sec, item.L, { signal });
           aiApplyLineText(item.L, r.text);
           if(r.note) notes.push(t("aiNoteLine", item.si + 1, item.li + 1) + " " + r.note);
           ok++;
-          render();
         }catch(e){
+          if(e.aiAborted){ stopped = true; break; }
           skip++;
           notes.push(t("aiNoteLine", item.si + 1, item.li + 1) + " " + t("aiSkipFail", e.message));
         }
+        aiProgDone++;
+        render();
       }
     }else{
       /* 检查/润色：整首一起交给 AI 审，返回逐句建议，逐句本地校验后才采用 */
-      aiSetBusy(true, t("aiWorkingCheck"));
+      const scopeSi = aiScopeIndex();
       const messages = [
         { role: "system", content: aiSystemPrompt() },
         { role: "user", content:
             "这是当前的歌词工程（每句开头是分句格数，□ 是空格）：\n\n" + aiSongBrief() +
+            (scopeSi !== null ? t("aiScopeHintSec", scopeSi + 1, state.sections[scopeSi].name) : "") +
             "\n\n请通读全篇，从押韵、意象、口吻、叙事连贯的角度，挑出值得改写的句子并给出替换文本。" +
             "\n只改确实更好的句子，不要为了改而改；替换文本必须严格符合该句词格。" +
             "\n输出 JSON：{\"suggestions\":[{\"sec\":段落序号(从1起),\"line\":句序号(段内从1起),\"text\":\"替换文本(分句间用空格分隔)\",\"why\":\"一句话理由\"}]}。" +
             "\n没有值得改的就返回 {\"suggestions\":[]}。" }
       ];
-      const raw = await aiChat(messages);
+      const raw = await aiChat(messages, { signal });
       let j;
       try{ j = aiParseJson(raw); }
       catch(e){ throw new Error(t("aiCheckJson")); }
       const sug = Array.isArray(j.suggestions) ? j.suggestions : [];
-      for(const s of sug){
+      aiProgTotal = Math.max(sug.length, 1);
+      for(let i = 0; i < sug.length; i++){
+        const s = sug[i];
+        if(aiAbort.cancelled){ stopped = true; break; }
+        aiSetProgress(i, sug.length, t("aiProg", i, sug.length));
         const sec = state.sections[(s.sec | 0) - 1];
         const L = sec && sec.lines[(s.line | 0) - 1];
         if(!L) continue;
+        if(scopeSi !== null && (s.sec | 0) - 1 !== scopeSi) continue;   // 范围外建议直接忽略，不计失败
         const chk = aiCheckFill(s.text, L.g);
         if(chk !== null){ skip++; notes.push(t("aiNoteLine", s.sec, s.line) + " " + t("aiSkipFail", chk)); continue; }
-        const parts = s.text.trim().split(/\s+/);
         const oldText = RT(L.t) || t("versionEmpty");
-        aiApplyLineText(L, s.text);
+        aiApplyLineText(L, s.text);   // 原写法在 aiApplyLineText 里自动存备选
         if(s.why) notes.push(t("aiNoteLine", s.sec, s.line) + " " + oldText + " → " + RT(L.t) + "（" + s.why + "）");
         ok++;
       }
       render();
     }
   }catch(e){
-    toast(t("aiToastFail", e.message));
+    if(e.aiAborted) stopped = true;
+    else toast(t("aiToastFail", e.message));
   }finally{
+    aiAbort = null;
     aiSetBusy(false);
     render();
     const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
-    const summary = mode === "fill" ? t("aiDoneFill", ok, skip, secs) : t("aiDoneCheck", ok, skip, secs);
+    let summary;
+    if(stopped) summary = t("aiDoneStopped", ok, skip, secs);
+    else summary = mode === "fill" ? t("aiDoneFill", ok, skip, secs) : t("aiDoneCheck", ok, skip, secs);
+    aiSetProgress(aiProgDone, aiProgTotal, summary);
     if(notes.length){
       aiLog(summary + "\n" + notes.join("\n"));
       toast(t("aiToastSeeLog"));
@@ -287,7 +354,31 @@ async function aiRunAll(mode){
       aiLog(summary);
       toast(summary);
     }
+    const pend = $("#aipending"); if(pend) pend.textContent = t("aiPending", aiPendingLines().length);
     save();
+  }
+}
+
+/* ---------- 测试连接 ---------- */
+async function aiTest(){
+  if(aiBusy) return;
+  if(!aiNormBase(aiCfg.baseUrl) || !aiCfg.apiKey || !aiCfg.model){
+    aiOpenPanel();
+    toast(t("aiToastNeedCfg"));
+    return;
+  }
+  const btn = $("#aitest");
+  btn.disabled = true; btn.textContent = t("aiTesting");
+  try{
+    const r = await aiChat([{ role: "user", content: "请只回复两个字：正常" }], { temperature: 0, maxTokens: 16 });
+    const reply = String(r).trim().slice(0, 60);
+    aiLog(t("aiToastTestOk", reply)); toast(t("aiToastTestOk", reply));
+  }catch(e){
+    aiLog(t("aiToastTestFail", e.message)); toast(t("aiToastTestFail", e.message));
+  }finally{
+    btn.textContent = t("aiTestBtn");
+    btn.disabled = aiBusy;
+    aiSyncPanel();
   }
 }
 
@@ -304,7 +395,10 @@ function aiLog(msg){
 
 /* ---------- 面板 UI ---------- */
 function aiOpenPanel(){ $("#aip").classList.add("show"); aiSyncPanel(); }
-function aiClosePanel(){ $("#aip").classList.remove("show"); }
+function aiClosePanel(){
+  if(aiBusy){ toast(t("aiBlockedClose")); return; }   // 运行中不许关：关了就看不见停止按钮了
+  $("#aip").classList.remove("show");
+}
 
 function aiSyncPanel(){
   $("#aiurl").value = aiCfg.baseUrl;
@@ -315,8 +409,18 @@ function aiSyncPanel(){
   $("#aimaxv").textContent = aiCfg.maxTokens;
   $("#aitemp").value = aiCfg.temperature;
   $("#aitempv").textContent = Number(aiCfg.temperature).toFixed(1);
-  $("#aigo").disabled = aiBusy;
-  $("#aichk").disabled = aiBusy;
+  /* 范围下拉：段落名可能改过，每次打开重建 */
+  const sel = $("#aiscope");
+  const want = aiScopeIndex() === null ? "all" : "sec-" + aiScopeIndex();
+  sel.innerHTML = "";
+  const o0 = el("option"); o0.value = "all"; o0.textContent = t("aiScopeAll"); sel.appendChild(o0);
+  state.sections.forEach((sec, i) => {
+    const o = el("option"); o.value = "sec-" + i; o.textContent = t("aiScopeSec", i + 1, sec.name); sel.appendChild(o);
+  });
+  sel.value = want; aiCfg.scope = want;
+  const pend = $("#aipending");
+  if(pend) pend.textContent = t("aiPending", aiPendingLines().length);
+  if(!aiBusy){ aiSetBusy(false); }
 }
 
 function aiBind(){
@@ -330,27 +434,35 @@ function aiBind(){
   $("#aistyle").addEventListener("input", e => { aiCfg.style = e.target.value; aiSaveCfg(); });
   $("#aimax").addEventListener("input", e => { aiCfg.maxTokens = +e.target.value; $("#aimaxv").textContent = e.target.value; aiSaveCfg(); });
   $("#aitemp").addEventListener("input", e => { aiCfg.temperature = +e.target.value; $("#aitempv").textContent = Number(e.target.value).toFixed(1); aiSaveCfg(); });
+  $("#aiscope").addEventListener("change", e => {
+    aiCfg.scope = e.target.value; aiSaveCfg();
+    const pend = $("#aipending"); if(pend) pend.textContent = t("aiPending", aiPendingLines().length);
+  });
 
   $("#aibtn").onclick = () => { if($("#aip").classList.contains("show")) aiClosePanel(); else aiOpenPanel(); };
   $("#aiclose").onclick = aiClosePanel;
   $("#aip").onclick = e => { if(e.target.id === "aip") aiClosePanel(); };
   $("#aigo").onclick = () => aiRunAll("fill");
   $("#aichk").onclick = () => aiRunAll("check");
+  $("#aitest").onclick = aiTest;
+  $("#aistop").onclick = aiStop;
 
-  /* Escape 关面板，跟 help/exp/bgp 一致 */
+  /* Escape 关面板，跟 help/exp/bgp 一致（运行中会被 aiClosePanel 拦下） */
   document.addEventListener("keydown", e => {
     if(e.key === "Escape" && $("#aip").classList.contains("show")) aiClosePanel();
   });
 }
 
-/* 帮助面板里追加一段 AI 说明（i18n key：aiHelp*)，DOMContentLoaded 时由 index.html 触发 */
+/* 帮助面板里追加一段 AI 说明（i18n key：aiHelp*)，由 index.html boot 时触发 */
 function aiInjectHelp(){
   const anchor = document.querySelector("#help .card .credit");
   if(!anchor) return;
   const h4 = el("h4"); h4.dataset.i18n = "aiHelpH4"; h4.textContent = t("aiHelpH4");
   const p1 = el("p"); p1.dataset.i18n = "aiHelpP1"; p1.innerHTML = t("aiHelpP1");
   const p2 = el("p"); p2.dataset.i18n = "aiHelpP2"; p2.innerHTML = t("aiHelpP2");
+  const p3 = el("p"); p3.dataset.i18n = "aiHelpP3"; p3.innerHTML = t("aiHelpP3");
   anchor.parentNode.insertBefore(h4, anchor);
   anchor.parentNode.insertBefore(p1, anchor);
   anchor.parentNode.insertBefore(p2, anchor);
+  anchor.parentNode.insertBefore(p3, anchor);
 }
