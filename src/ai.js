@@ -477,8 +477,10 @@ function aiInjectHelp(){
   const p1 = el("p"); p1.dataset.i18n = "aiHelpP1"; p1.innerHTML = t("aiHelpP1");
   const p2 = el("p"); p2.dataset.i18n = "aiHelpP2"; p2.innerHTML = t("aiHelpP2");
   const p3 = el("p"); p3.dataset.i18n = "aiHelpP3"; p3.innerHTML = t("aiHelpP3");
+  const pd = el("p"); pd.dataset.i18n = "aiDisclaimer"; pd.innerHTML = t("aiDisclaimer"); pd.style.color = "var(--ovf)";
   anchor.parentNode.insertBefore(h4, anchor);
   anchor.parentNode.insertBefore(p1, anchor);
   anchor.parentNode.insertBefore(p2, anchor);
   anchor.parentNode.insertBefore(p3, anchor);
+  anchor.parentNode.insertBefore(pd, anchor);
 }
